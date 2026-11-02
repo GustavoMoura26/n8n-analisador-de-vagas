@@ -1,0 +1,536 @@
+{
+  "name": "Analisador de Vagas com IA",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## ⚙️ Comece por aqui\n\n1. Edite o nó **Configuração** com o seu perfil profissional, a nota mínima e as palavras-chave da sua área.\n2. Selecione suas credenciais nos nós **Google Gemini Chat Model** e **Salvar na planilha**.\n3. Escolha a planilha no nó **Salvar na planilha** (colunas: nota, resumo, titulo, link, requisitos, data_analise).\n\nDetalhes no README do repositório.",
+        "height": 300,
+        "width": 420,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        40,
+        -300
+      ],
+      "id": "a0000000-0000-4000-8000-000000000001",
+      "name": "Leia-me"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        96,
+        64
+      ],
+      "id": "a0000000-0000-4000-8000-000000000002",
+      "name": "Agendamento diário"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0000000-0000-4000-8000-000000000101",
+              "name": "perfil_candidato",
+              "value": "Substitua este texto pelo resumo do seu perfil profissional. Inclua: cargo atual e senioridade, anos de experiência, principais tecnologias e ferramentas que domina, experiências relevantes, formação e certificações. Quanto mais específico, melhor a análise da IA.",
+              "type": "string"
+            },
+            {
+              "id": "a0000000-0000-4000-8000-000000000102",
+              "name": "nota_minima",
+              "value": 70,
+              "type": "number"
+            },
+            {
+              "id": "a0000000-0000-4000-8000-000000000103",
+              "name": "palavras_chave",
+              "value": "erp, power bi, jira, servicenow, power automate, n8n, rpa, itsm, sql",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        320,
+        64
+      ],
+      "id": "a0000000-0000-4000-8000-000000000003",
+      "name": "Configuração"
+    },
+    {
+      "parameters": {
+        "url": "https://apibr.com/vagas/api/v2/vagas",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        528,
+        64
+      ],
+      "id": "a0000000-0000-4000-8000-000000000004",
+      "name": "Buscar vagas"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a0000000-0000-4000-8000-000000000201",
+              "leftValue": "={{ [$json.title, ...($json.labels || []).map(l => l.name ?? l), ...($json.keywords || [])].join(' ').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').match(/\\b(remot[oa]?|remote|home ?office|brasil|brazil|anywhere)\\b/) !== null }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        768,
+        64
+      ],
+      "id": "a0000000-0000-4000-8000-000000000005",
+      "name": "Filtro Brasil/Remoto"
+    },
+    {
+      "parameters": {
+        "maxItems": 50
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        64
+      ],
+      "id": "a0000000-0000-4000-8000-000000000006",
+      "name": "Limitar vagas"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0000000-0000-4000-8000-000000000301",
+              "name": "titulo",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "a0000000-0000-4000-8000-000000000302",
+              "name": "requisitos",
+              "value": "={{ ($json.labels || []).map(l => l.name ?? l).join(', ') }}",
+              "type": "string"
+            },
+            {
+              "id": "a0000000-0000-4000-8000-000000000303",
+              "name": "modalidade",
+              "value": "={{ $json.keywords || [] }}",
+              "type": "array"
+            },
+            {
+              "id": "a0000000-0000-4000-8000-000000000304",
+              "name": "link",
+              "value": "={{ $json.html_url || $json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "a0000000-0000-4000-8000-000000000305",
+              "name": "descricao",
+              "value": "={{ ($json.body || '').substring(0, 4000) }}",
+              "type": "string"
+            },
+            {
+              "id": "a0000000-0000-4000-8000-000000000306",
+              "name": "tem_palavra_chave",
+              "value": "={{ (() => { const limpar = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, ''); const texto = limpar([$json.title, ...($json.labels || []).map(l => l.name ?? l), $json.body].join(' ')); const termos = $('Configuração').first().json.palavras_chave.split(',').map(t => limpar(t).trim()).filter(Boolean); return termos.length > 0 && new RegExp('\\\\b(' + termos.join('|') + ')\\\\b').test(texto); })() }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1232,
+        64
+      ],
+      "id": "a0000000-0000-4000-8000-000000000007",
+      "name": "Preparar dados da vaga"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Você é um especialista em recrutamento e seleção focado em análise de aderência de perfis profissionais a vagas de tecnologia.\n\nSua tarefa é analisar o perfil profissional fornecido e compará-lo com a vaga descrita, retornando rigorosamente e apenas um JSON válido com a avaliação.\n\n--- DADOS DA VAGA ---\n- Título da Vaga: {{ $json.titulo }}\n- Tags/Requisitos: {{ $json.requisitos }}\n- Modalidade: {{ ($json.modalidade || []).join(', ') }}\n- Descrição completa da vaga:\n{{ $json.descricao }}\n\n--- DADOS DO CANDIDATO ---\n{{ $('Configuração').first().json.perfil_candidato }}\n\n--- INSTRUÇÕES DE RESPOSTA ---\n- Calcule a compatibilidade técnica e comportamental entre a vaga e o perfil (0 a 100).\n- Escreva um resumo analítico detalhando os pontos fortes, eventuais lacunas (gaps) de competência e a aderência geral ao cargo.\n- Não inclua explicações, introduções ou marcadores markdown adicionais fora do bloco JSON.\n\n--- FORMATO DE SAÍDA ESPERADO ---\n{\n  \"nota_compatibilidade\": 85,\n  \"resumo_ia\": \"Texto explicativo detalhando a compatibilidade...\"\n}",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {
+          "batchSize": 1,
+          "delayBetweenBatches": 6000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1456,
+        64
+      ],
+      "id": "a0000000-0000-4000-8000-000000000008",
+      "name": "Análise de compatibilidade (IA)"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1392,
+        272
+      ],
+      "id": "a0000000-0000-4000-8000-000000000009",
+      "name": "Google Gemini Chat Model"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0000000-0000-4000-8000-000000000401",
+              "name": "nota",
+              "value": "={{ JSON.parse($json.text.slice($json.text.indexOf('{'), $json.text.lastIndexOf('}') + 1)).nota_compatibilidade }}",
+              "type": "number"
+            },
+            {
+              "id": "a0000000-0000-4000-8000-000000000402",
+              "name": "resumo",
+              "value": "={{ JSON.parse($json.text.slice($json.text.indexOf('{'), $json.text.lastIndexOf('}') + 1)).resumo_ia }}",
+              "type": "string"
+            },
+            {
+              "id": "a0000000-0000-4000-8000-000000000403",
+              "name": "titulo",
+              "value": "={{ $('Preparar dados da vaga').item.json.titulo }}",
+              "type": "string"
+            },
+            {
+              "id": "a0000000-0000-4000-8000-000000000404",
+              "name": "link",
+              "value": "={{ $('Preparar dados da vaga').item.json.link }}",
+              "type": "string"
+            },
+            {
+              "id": "a0000000-0000-4000-8000-000000000405",
+              "name": "requisitos",
+              "value": "={{ $('Preparar dados da vaga').item.json.requisitos }}",
+              "type": "string"
+            },
+            {
+              "id": "a0000000-0000-4000-8000-000000000406",
+              "name": "data_analise",
+              "value": "={{ $now.toFormat('yyyy-MM-dd') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1776,
+        64
+      ],
+      "id": "a0000000-0000-4000-8000-000000000010",
+      "name": "Extrair resultado"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a0000000-0000-4000-8000-000000000501",
+              "leftValue": "={{ $json.nota }}",
+              "rightValue": "={{ $('Configuração').first().json.nota_minima }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "a0000000-0000-4000-8000-000000000502",
+              "leftValue": "={{ $('Preparar dados da vaga').item.json.tem_palavra_chave }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2000,
+        64
+      ],
+      "id": "a0000000-0000-4000-8000-000000000011",
+      "name": "Vaga aderente?"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "link"
+          ],
+          "schema": [
+            {
+              "id": "nota",
+              "displayName": "nota",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "resumo",
+              "displayName": "resumo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "titulo",
+              "displayName": "titulo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "link",
+              "displayName": "link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "requisitos",
+              "displayName": "requisitos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "data_analise",
+              "displayName": "data_analise",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2224,
+        -32
+      ],
+      "id": "a0000000-0000-4000-8000-000000000012",
+      "name": "Salvar na planilha"
+    }
+  ],
+  "connections": {
+    "Agendamento diário": {
+      "main": [
+        [
+          {
+            "node": "Configuração",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuração": {
+      "main": [
+        [
+          {
+            "node": "Buscar vagas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar vagas": {
+      "main": [
+        [
+          {
+            "node": "Filtro Brasil/Remoto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro Brasil/Remoto": {
+      "main": [
+        [
+          {
+            "node": "Limitar vagas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limitar vagas": {
+      "main": [
+        [
+          {
+            "node": "Preparar dados da vaga",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar dados da vaga": {
+      "main": [
+        [
+          {
+            "node": "Análise de compatibilidade (IA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Análise de compatibilidade (IA)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Análise de compatibilidade (IA)": {
+      "main": [
+        [
+          {
+            "node": "Extrair resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair resultado": {
+      "main": [
+        [
+          {
+            "node": "Vaga aderente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vaga aderente?": {
+      "main": [
+        [
+          {
+            "node": "Salvar na planilha",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
